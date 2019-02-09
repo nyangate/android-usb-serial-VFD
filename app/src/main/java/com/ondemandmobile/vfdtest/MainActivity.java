@@ -30,27 +30,40 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             switch (intent.getAction()) {
                 case UsbService.ACTION_USB_PERMISSION_GRANTED: // USB PERMISSION GRANTED
-                    Toast.makeText(context, "USB Ready", Toast.LENGTH_SHORT).show();
-                    new Handler().postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            showGreeting();
-                            init();
-                        }
-                    },3000);
+                    Toast.makeText(context, "Permission Granted", Toast.LENGTH_SHORT).show();
 
+//                    showGreeting("Connected","Welcome");
                     break;
                 case UsbService.ACTION_USB_PERMISSION_NOT_GRANTED: // USB PERMISSION NOT GRANTED
                     Toast.makeText(context, "USB Permission not granted", Toast.LENGTH_SHORT).show();
+                    new Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            showGreeting("Display Ready", "Waiting for login");
+                        }
+                    },2000);
+                    break;
+                case UsbService.ACTION_USB_READY: // USB PERMISSION NOT GRANTED
+//                    Toast.makeText(context, "USB Ready", Toast.LENGTH_SHORT).show();
+                    showGreeting("Display Ready", "Waiting for login");
+                    break;
+                case UsbService.ACTION_USB_ATTACHED: // USB PERMISSION NOT GRANTED
+//                    Toast.makeText(context, "USB Attached", Toast.LENGTH_SHORT).show();
                     break;
                 case UsbService.ACTION_NO_USB: // NO USB CONNECTED
-                    Toast.makeText(context, "No USB connected", Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(context, "No USB connected", Toast.LENGTH_SHORT).show();
                     break;
                 case UsbService.ACTION_USB_DISCONNECTED: // USB DISCONNECTED
                     Toast.makeText(context, "USB disconnected", Toast.LENGTH_SHORT).show();
                     break;
                 case UsbService.ACTION_USB_NOT_SUPPORTED: // USB NOT SUPPORTED
                     Toast.makeText(context, "USB device not supported", Toast.LENGTH_SHORT).show();
+                    break;
+                case UsbService.ACTION_CDC_DRIVER_NOT_WORKING:
+                    Toast.makeText(context, "input/output error", Toast.LENGTH_SHORT).show();
+                    break;
+                case UsbService.ACTION_USB_DEVICE_NOT_WORKING:
+                    Toast.makeText(context, "port connection error", Toast.LENGTH_SHORT).show();
                     break;
             }
         }
@@ -91,11 +104,11 @@ public class MainActivity extends AppCompatActivity {
                         usbService.write(new byte[]{0x0C});
                     }
                     String data = editText.getText().toString();
-                    byte[] vfdata = new byte [40];
-                    showToast("data byte length is "+data.getBytes().length);
-                    int finish = data.getBytes().length>40? 40: data.getBytes().length;
-                    showToast("byte length is "+finish);
-                    for (int i = 0; i <finish; i++) {
+                    byte[] vfdata = new byte[40];
+                    showToast("data byte length is " + data.getBytes().length);
+                    int finish = data.getBytes().length > 40 ? 40 : data.getBytes().length;
+                    showToast("byte length is " + finish);
+                    for (int i = 0; i < finish; i++) {
 
                         vfdata[i] = data.getBytes()[i];
                     }
@@ -106,55 +119,67 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    public void PrintFirstLine(String text){
-        try{
-            ClearDisplay();
-            if(text.length()>20)            //Display can hold only 20 characters per line.Most of displays have 2 lines.
-                text=text.substring(0,20);
-            usbService.write(text.getBytes());
 
-        }
-        catch(Exception r){
+    public void PrintFirstLine(String text) {
+        try {
+//            Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+            ClearDisplay();
+            if (text.length() > 20)            //Display can hold only 20 characters per line.Most of displays have 2 lines.
+                text = text.substring(0, 20);
+
+            usbService.write(text.getBytes());
+        } catch (Exception r) {
+//            Toast.makeText(this, "error: "+r.getMessage(), Toast.LENGTH_SHORT).show();
         }
 
     }
-    public void PrintSecondLine(String text){
-        try{
+
+    public void PrintSecondLine(String text) {
+        try {
             usbService.write(ESCPOS.SELECT_DISPLAY);
             usbService.write(ESCPOS.Down_Line);
             usbService.write(ESCPOS.Left_Line);
-            if(text.length()>20)
-                text=text.substring(0,20);
+            if (text.length() > 20)
+                text = text.substring(0, 20);
             usbService.write(text.getBytes());
-        }
-        catch(Exception y){
-            System.out.println("Failed to print second line because of :"+y);
+        } catch (Exception y) {
+            System.out.println("Failed to print second line because of :" + y);
         }
     }
-    public void showGreeting(){
-        String text1="*****Thank You******";                              // 20 characters
-        String text2="  Please Come Again ";                              //20 characters
+
+    public void showGreeting(String title, String message) {
+        String text1 = title;                              // 20 characters
+        String text2 = message;                              //20 characters
         ClearDisplay();
         PrintFirstLine(text1);
+        init();
         PrintSecondLine(text2);
-        try {
-            Thread.sleep(5000);                                   //Greeting will dislpay 5 seconds.
-        } catch (InterruptedException ex) {
-        }
-        ClearDisplay();
+        init();
+//        try {
+//            Thread.sleep(5000);                                   //Greeting will dislpay 5 seconds.
+//        } catch (InterruptedException ex) {
+//        }
+//        ClearDisplay();
 
     }
 
-    private void ClearDisplay() {
+    public void ClearDisplay() {
         if (usbService != null) { // if UsbService was correctly binded, Send data
             usbService.write(new byte[]{0x0C});
+        } else {
+//            Toast.makeText(this, "usb not connected", Toast.LENGTH_SHORT).show();
         }
     }
 
-    public void init(){
-        if(usbService!=null) {
+    public void init() {
+        if (usbService != null) {
             usbService.write(ESCPOS.Anim);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 
     private void showToast(String s) {
@@ -198,6 +223,8 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(UsbService.ACTION_USB_DISCONNECTED);
         filter.addAction(UsbService.ACTION_USB_NOT_SUPPORTED);
         filter.addAction(UsbService.ACTION_USB_PERMISSION_NOT_GRANTED);
+        filter.addAction(UsbService.ACTION_USB_DEVICE_NOT_WORKING);
+        filter.addAction(UsbService.ACTION_CDC_DRIVER_NOT_WORKING);
         registerReceiver(mUsbReceiver, filter);
     }
 
@@ -215,16 +242,27 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case UsbService.MESSAGE_FROM_SERIAL_PORT:
-                    String data = (String) msg.obj;
-                    mActivity.get().display.append(data);
+//                    String data = (String) msg.obj;
+//                    Toast.makeText(mActivity.get(), data,Toast.LENGTH_LONG).show();
+//                    mActivity.get().display.append(data);
                     break;
                 case UsbService.CTS_CHANGE:
-                    Toast.makeText(mActivity.get(), "CTS_CHANGE",Toast.LENGTH_LONG).show();
+                    Toast.makeText(mActivity.get(), "CTS_CHANGE", Toast.LENGTH_LONG).show();
                     break;
                 case UsbService.DSR_CHANGE:
-                    Toast.makeText(mActivity.get(), "DSR_CHANGE",Toast.LENGTH_LONG).show();
+                    Toast.makeText(mActivity.get(), "DSR_CHANGE", Toast.LENGTH_LONG).show();
                     break;
             }
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
     }
 }

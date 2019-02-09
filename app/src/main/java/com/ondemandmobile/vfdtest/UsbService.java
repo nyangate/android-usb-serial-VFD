@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
@@ -117,9 +118,15 @@ public class UsbService extends Service {
                 Intent intent = new Intent(ACTION_USB_DISCONNECTED);
                 arg0.sendBroadcast(intent);
                 if (serialPortConnected) {
-                    serialPort.close();
+                    try{
+                        serialPort.close();
+                        serialPortConnected = false;
+                    }catch (Exception e){
+
+                    }
+
                 }
-                serialPortConnected = false;
+
             }
         }
     };
@@ -164,6 +171,14 @@ public class UsbService extends Service {
     public void write(byte[] data) {
         if (serialPort != null) {
             serialPort.write(data);
+        }else{
+            try {
+                String mdata = "Serial port is null";
+                if (mHandler != null)
+                    mHandler.obtainMessage(MESSAGE_FROM_SERIAL_PORT, mdata).sendToTarget();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
     }
@@ -182,8 +197,14 @@ public class UsbService extends Service {
                 int deviceVID = device.getVendorId();
                 int devicePID = device.getProductId();
 
-                if (deviceVID != 0x1d6b && (devicePID != 0x0001 && devicePID != 0x0002 && devicePID != 0x0003) && deviceVID != 0x5c6 && devicePID != 0x904c) {
-              
+//                if (deviceVID != 0x1d6b &&
+//                        (devicePID != 0x0001 &&
+//                                devicePID != 0x0002
+//                        && devicePID != 0x0003) &&
+//                        deviceVID != 0x5c6 && devicePID != 0x904c) {
+                //real device vendor ids: deviceVID == 0x0bda || deviceVID == 0x222a || deviceVID==
+                // 0x10c4 ||
+                    if( deviceVID == 0x67b){
                     // There is a device connected to our Android device. Try to open it as a Serial Port.
                     requestUserPermission();
                     keep = false;
@@ -219,8 +240,15 @@ public class UsbService extends Service {
      * Request user permission. The response will be received in the BroadcastReceiver
      */
     private void requestUserPermission() {
-        PendingIntent mPendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
-        usbManager.requestPermission(device, mPendingIntent);
+        int checkVal = this.checkCallingOrSelfPermission(ACTION_USB_PERMISSION);
+        if(PackageManager.PERMISSION_GRANTED == checkVal){
+            Intent intent = new Intent(ACTION_USB_PERMISSION_GRANTED);
+            sendBroadcast(intent);
+        }else{
+            PendingIntent mPendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+            usbManager.requestPermission(device, mPendingIntent);
+        }
+
     }
 
     public class UsbBinder extends Binder {
